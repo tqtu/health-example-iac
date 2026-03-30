@@ -5,78 +5,76 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}Building Enterprise IaC Structure for Luca...${NC}"
+echo -e "${BLUE}🚀 Building PRODUCTION-GRADE IaC Structure for Luca...${NC}"
 
-# 1. Create Directory Structure
-mkdir -p modules/vpc modules/ec2-instance environments/qa/
+# 1. Create Comprehensive Directory Structure
+mkdir -p bootstrap global/iam global/route53 \
+         modules/vpc modules/security-groups modules/ec2-instance modules/rds \
+         environments/qa environments/staging environments/prod
 
 # ---------------------------------------------------------
-# 2. MODULE: VPC
+# 2. BOOTSTRAP: The "State of States"
 # ---------------------------------------------------------
-echo "Generating VPC Module..."
+echo "Generating Bootstrap Layer..."
+cat <<EOF > bootstrap/main.tf
+provider "aws" { region = "ap-southeast-2" }
 
-cat <<EOF > modules/vpc/variables.tf
-variable "env" {}
-variable "aws_region" {}
-variable "vpc_cidr" {}
-variable "public_subnet_cidr" {}
+resource "aws_s3_bucket" "terraform_state" {
+  bucket = "luca-terraform-state-storage-\${random_id.suffix.hex}"
+  force_destroy = true
+}
+
+resource "aws_dynamodb_table" "terraform_locks" {
+  name         = "terraform-state-locking"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "LockID"
+  attribute { name = "LockID", type = "S" }
+}
+
+resource "random_id" "suffix" { byte_length = 4 }
 EOF
 
+# ---------------------------------------------------------
+# 3. MODULE: VPC (Production Grade - Multi-AZ)
+# ---------------------------------------------------------
+echo "Generating Advanced VPC Module..."
 cat <<EOF > modules/vpc/main.tf
-resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
+resource "aws_vpc" "this" {
+  cidr_block           = var.cidr
   enable_dns_hostnames = true
-  tags = { Name = "\${var.env}-vpc" }
+  enable_dns_support   = true
+  tags = merge(var.common_tags, { Name = "\${var.env}-vpc" })
 }
 
 resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidr
+  count             = 2
+  vpc_id            = aws_vpc.this.id
+  cidr_block        = cidrsubnet(var.cidr, 8, count.index)
+  availability_zone = data.aws_availability_zones.available.names[count.index]
   map_public_ip_on_launch = true
-  tags = { Name = "\${var.env}-public-subnet" }
+  tags = merge(var.common_tags, { Name = "\${var.env}-public-\${count.index}" })
 }
 
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.main.id
-}
+data "aws_availability_zones" "available" {}
 
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-}
-
-resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public.id
-  route_table_id = aws_route_table.public.id
-}
+output "vpc_id" { value = aws_vpc.this.id }
+output "public_subnet_ids" { value = aws_subnet.public[*].id }
 EOF
 
-cat <<EOF > modules/vpc/outputs.tf
-output "vpc_id" { value = aws_vpc.main.id }
-output "public_subnet_id" { value = aws_subnet.public.id }
-EOF
-
-# ---------------------------------------------------------
-# 3. MODULE: EC2-INSTANCE
-# ---------------------------------------------------------
-echo "Generating EC2 Module..."
-
-cat <<EOF > modules/ec2-instance/variables.tf
+cat <<EOF > modules/vpc/variables.tf
+variable "cidr" {}
 variable "env" {}
-variable "vpc_id" {}
-variable "subnet_id" {}
-variable "ami_id" {}
-variable "instance_type" {}
-variable "key_name" {}
+variable "common_tags" { type = map(string) }
 EOF
 
-cat <<EOF > modules/ec2-instance/main.tf
-resource "aws_security_group" "app_sg" {
-  name   = "\${var.env}-app-sg"
-  vpc_id = var.vpc_id
+# ---------------------------------------------------------
+# 4. MODULE: SECURITY GROUPS (Isolated)
+# ---------------------------------------------------------
+echo "Generating Security Groups Module..."
+cat <<EOF > modules/security-groups/main.tf
+resource "aws_security_group" "web_sg" {
+  name        = "\${var.env}-web-sg"
+  vpc_id      = var.vpc_id
 
   ingress {
     from_port   = 8080
@@ -89,7 +87,7 @@ resource "aws_security_group" "app_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.my_ip] 
   }
 
   egress {
@@ -100,78 +98,102 @@ resource "aws_security_group" "app_sg" {
   }
 }
 
-resource "aws_instance" "this" {
+output "web_sg_id" { value = aws_security_group.web_sg.id }
+EOF
+
+cat <<EOF > modules/security-groups/variables.tf
+variable "vpc_id" {}
+variable "env" {}
+variable "my_ip" { default = "0.0.0.0/0" }
+EOF
+
+# ---------------------------------------------------------
+# 5. MODULE: EC2 (Standardized)
+# ---------------------------------------------------------
+echo "Generating EC2 Module..."
+cat <<EOF > modules/ec2-instance/main.tf
+resource "aws_instance" "app" {
   ami           = var.ami_id
   instance_type = var.instance_type
   subnet_id     = var.subnet_id
+  vpc_security_group_ids = [var.security_group_id]
   key_name      = var.key_name
-  vpc_security_group_ids = [aws_security_group.app_sg.id]
 
-  user_data = <<-EOT
-              #!/bin/bash
-              sudo apt update -y
-              sudo apt install -y docker.io docker-compose-v2
-              sudo systemctl start docker
-              sudo usermod -aG docker ubuntu
-              EOT
+  user_data = file("\${path.module}/scripts/install_docker.sh")
 
-  tags = { Name = "\${var.env}-server" }
+  tags = merge(var.common_tags, { Name = "\${var.env}-server" })
 }
 EOF
 
-cat <<EOF > modules/ec2-instance/outputs.tf
-output "server_public_ip" { value = aws_instance.this.public_ip }
+mkdir -p modules/ec2-instance/scripts
+cat <<EOF > modules/ec2-instance/scripts/install_docker.sh
+#!/bin/bash
+sudo apt update -y
+sudo apt install -y docker.io docker-compose-v2
+sudo systemctl start docker
+sudo usermod -aG docker ubuntu
+EOF
+
+cat <<EOF > modules/ec2-instance/variables.tf
+variable "ami_id" {}
+variable "instance_type" {}
+variable "subnet_id" {}
+variable "security_group_id" {}
+variable "key_name" {}
+variable "env" {}
+variable "common_tags" { type = map(string) }
 EOF
 
 # ---------------------------------------------------------
-# 4. ENVIRONMENT: QA
+# 6. ENVIRONMENT: QA (Implementation)
 # ---------------------------------------------------------
-echo "Generating QA Environment..."
-
-cat <<EOF > environments/qa/providers.tf
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
+echo "Wiring up QA Environment..."
+cat <<EOF > environments/qa/main.tf
+locals {
+  env = "qa"
+  common_tags = {
+    Project     = "HealthApp"
+    Environment = "qa"
+    ManagedBy   = "Terraform"
   }
 }
 
-provider "aws" {
-  region = "ap-southeast-2"
+module "vpc" {
+  source = "../../modules/vpc"
+  env    = local.env
+  cidr   = "10.10.0.0/16"
+  common_tags = local.common_tags
 }
-EOF
 
-cat <<EOF > environments/qa/main.tf
-module "network" {
-  source             = "../../modules/vpc"
-  env                = "qa"
-  aws_region         = "ap-southeast-2"
-  vpc_cidr           = "10.10.0.0/16"
-  public_subnet_cidr = "10.10.1.0/24"
+module "security_groups" {
+  source = "../../modules/security-groups"
+  env    = local.env
+  vpc_id = module.vpc.vpc_id
 }
 
 module "compute" {
-  source        = "../../modules/ec2-instance"
-  env           = "qa"
-  vpc_id        = module.network.vpc_id
-  subnet_id     = module.network.public_subnet_id
-  ami_id        = "ami-0c2016462719f9b5a" # Ubuntu 24.04 Sydney
-  instance_type = "t3.micro"
-  key_name      = "key_learn_aws_instance_free"
-}
-
-output "qa_server_ip" {
-  value = module.compute.server_public_ip
+  source            = "../../modules/ec2-instance"
+  env               = local.env
+  ami_id            = "ami-0c2016462719f9b5a"
+  instance_type     = "t3.micro"
+  key_name          = "key_learn_aws_instance_free"
+  subnet_id         = module.vpc.public_subnet_ids[0]
+  security_group_id = module.security_groups.web_sg_id
+  common_tags       = local.common_tags
 }
 EOF
 
-# 5. Finalize
-touch .gitignore
-echo ".terraform/" >> .gitignore
-echo "*.tfstate*" >> .gitignore
-echo ".terraform.lock.hcl" >> .gitignore
+# Dummy backend file for structure
+cat <<EOF > environments/qa/backend.tf
+# terraform {
+#   backend "s3" {
+#     bucket         = "YOUR_BUCKET_NAME_FROM_BOOTSTRAP"
+#     key            = "environments/qa/terraform.tfstate"
+#     region         = "ap-southeast-2"
+#     dynamodb_table = "terraform-state-locking"
+#   }
+# }
+EOF
 
-echo -e "${GREEN}Done! Full IaC Architecture generated.${NC}"
-echo -e "To deploy QA: ${BLUE}cd environments/qa && terraform init && terraform apply${NC}"
+# Finalize
+echo -e "${GREEN}✅ Done! Enterprise Structure Created.${NC}"

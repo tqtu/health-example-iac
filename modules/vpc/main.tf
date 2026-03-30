@@ -1,29 +1,20 @@
-resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
+resource "aws_vpc" "this" {
+  cidr_block           = var.cidr
   enable_dns_hostnames = true
-  tags = { Name = "${var.env}-vpc" }
+  enable_dns_support   = true
+  tags = merge(var.common_tags, { Name = "${var.env}-vpc" })
 }
 
 resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidr
+  count             = 2
+  vpc_id            = aws_vpc.this.id
+  cidr_block        = cidrsubnet(var.cidr, 8, count.index)
+  availability_zone = data.aws_availability_zones.available.names[count.index]
   map_public_ip_on_launch = true
-  tags = { Name = "${var.env}-public-subnet" }
+  tags = merge(var.common_tags, { Name = "${var.env}-public-${count.index}" })
 }
 
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.main.id
-}
+data "aws_availability_zones" "available" {}
 
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-}
-
-resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public.id
-  route_table_id = aws_route_table.public.id
-}
+output "vpc_id" { value = aws_vpc.this.id }
+output "public_subnet_ids" { value = aws_subnet.public[*].id }
