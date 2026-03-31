@@ -1,4 +1,4 @@
-name: "Terraform Infrastructure Deployment"
+name: "Create Instances QA - Terraform Infrastructure "
 
 on:
   pull_request:
@@ -78,9 +78,18 @@ jobs:
     needs: terraform-plan
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'infrastructure' }}
     runs-on: ubuntu-latest
-
-    # ALWAYS force protected environment
     environment: infrastructure
+
+    # FIX 1: Provide AWS credentials so Apply can access the backend/provider
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_UNBOUNDSHARE }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_UNBOUNDSHARE }}
+      AWS_REGION: "ap-southeast-2"
+
+    # FIX 2: Set the working directory to ./environments/qa so it finds the downloaded 'tfplan'
+    defaults:
+      run:
+        working-directory: ./environments/qa
 
     steps:
       - name: "Checkout Code"
