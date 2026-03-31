@@ -8,9 +8,9 @@ locals {
 }
 
 module "vpc" {
-  source = "../../modules/vpc"
-  env    = local.env
-  cidr   = "10.10.0.0/16"
+  source      = "../../modules/vpc"
+  env         = local.env
+  cidr        = "10.10.0.0/16"
   common_tags = local.common_tags
 }
 
