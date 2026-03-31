@@ -21,8 +21,8 @@ module "security_groups" {
 }
 
 module "compute" {
-  source            = "../../modules/ec2-instance"
-  env               = local.env
+  source = "../../modules/ec2-instance"
+  env    = local.env
   # CHANGE THIS: This is the correct ID for Ubuntu 24.04 in Sydney (ap-southeast-2)
   ami_id            = "ami-0310483fb2b4881ef"
   instance_type     = "t3.micro"
