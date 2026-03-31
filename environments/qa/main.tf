@@ -52,11 +52,11 @@ module "security_groups" {
 module "compute" {
   source = "../../modules/ec2-instance"
 
-  env                = local.env
-  ami_id             = data.aws_ami.ubuntu.id
-  instance_type      = "t3.micro"
-  key_name           = "key_learn_aws_instance_free"
-  subnet_id          = module.vpc.public_subnet_ids[0]
-  security_group_id  = module.security_groups.web_sg_id
-  common_tags        = local.common_tags
+  env               = local.env
+  ami_id            = data.aws_ami.ubuntu.id
+  instance_type     = "t3.micro"
+  key_name          = "key_learn_aws_instance_free"
+  subnet_id         = module.vpc.public_subnet_ids[0]
+  security_group_id = module.security_groups.web_sg_id
+  common_tags       = local.common_tags
 }
