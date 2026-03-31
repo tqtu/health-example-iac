@@ -1,0 +1,90 @@
+name: "Terraform Infrastructure Deployment"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # STAGE 1: PLAN
+  terraform-plan:
+    name: "1. Infrastructure Plan"
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_UNBOUNDSHARE }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_UNBOUNDSHARE }}
+      AWS_REGION: "ap-southeast-2"
+      TF_LOG: "INFO"
+
+    defaults:
+      run:
+        working-directory: ./environments/qa
+
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "Install Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: "Terraform Init"
+        run: terraform init
+
+      - name: "Generate Execution Plan"
+        id: plan
+        run: terraform plan -no-color -input=false -out=tfplan
+
+      - name: "Upload Plan Artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: infrastructure-plan
+          path: ./environments/qa/tfplan
+          retention-days: 1
+
+  # STAGE 2: APPLY (Requires Manual DevOps Approval)
+  terraform-apply:
+    name: "2. Infrastructure Apply"
+    needs: terraform-plan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # This environment name must match the one created in GitHub Settings
+    environment: infrastructure
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_UNBOUNDSHARE }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_UNBOUNDSHARE }}
+      AWS_REGION: "ap-southeast-2"
+      TF_LOG: "INFO"
+
+    defaults:
+      run:
+        working-directory: ./environments/qa
+
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "Download Plan Artifact"
+        uses: actions/download-artifact@v4
+        with:
+          name: infrastructure-plan
+          path: ./environments/qa/
+
+      - name: "Install Terraform"
+        uses: hashicorp/setup-terraform@v3
+
+      - name: "Terraform Init"
+        run: terraform init
+
+      - name: "Execute Plan"
+        # Using the saved plan file ensures no changes occurred between Plan and Apply
+        run: terraform apply -auto-approve -input=false tfplan
