@@ -1,0 +1,47 @@
+name: "Terraform Route 53 Deployment"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Where to run? (global/qa/prod)"
+        required: true
+        default: "qa"
+        type: choice
+        options:
+          - global/route53
+          - environments/qa
+          - environments/prod
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_UNBOUNDSHARE }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_UNBOUNDSHARE }}
+  AWS_REGION: "ap-southeast-1" # Your Singapore Region
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        # This uses your input to go to the right folder automatically
+        working-directory: ./${{ github.event.inputs.environment }}
+
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: "Terraform Init"
+        run: terraform init
+
+      - name: "Terraform Plan"
+        run: terraform plan
+
+      - name: "Terraform Apply"
+        # Only apply if it's a manual trigger
+        run: terraform apply -auto-approve
