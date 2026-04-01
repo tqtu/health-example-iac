@@ -1,4 +1,11 @@
 variable "env" {}
-variable "domain_name" {}
-variable "s3_bucket_domain_name" {} # The regional domain name of your S3 bucket
+
 variable "common_tags" {}
+
+variable "domain_name" {
+  description = "The root domain (unboundshare.com)"
+}
+
+variable "s3_bucket_domain_name" {
+  description = "The S3 website endpoint"
+}
