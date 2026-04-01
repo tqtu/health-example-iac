@@ -68,6 +68,16 @@ module "compute" {
 # =========================
 # ROUTE
 # =========================
+
+# 1. ADD CLOUDFRONT
+module "cloudfront_qa" {
+  source              = "../../modules/cloudfront"
+  env                 = local.env
+  # Use the same endpoint you were using for Route 53
+  s3_website_endpoint = "unboundshare-frontend-qa-31-03-2026-1.s3-website-ap-southeast-1.amazonaws.com"
+  common_tags         = local.common_tags
+}
+
 # 2. Create the Hosted Zone (The $0.50 resource)
 # 1. Look up the existing zone created in the Global folder
 data "aws_route53_zone" "selected" {
@@ -76,14 +86,17 @@ data "aws_route53_zone" "selected" {
 
 # 2. Call the record module with a corrected path
 module "dns_record_qa" {
-  source = "../../global/route53"
+  # Note: Use your generic record module here
+  source = "../../modules/route53-record"
 
-  hosted_zone_id      = data.aws_route53_zone.selected.zone_id
-  domain_name         = "unboundshare.com"
-  subdomain           = "qa"
+  hosted_zone_id = data.aws_route53_zone.selected.zone_id
+  domain_name    = "unboundshare.com"
+  subdomain      = "qa"
 
-  s3_website_endpoint = "unboundshare-frontend-qa-31-03-2026-1.s3-website-ap-southeast-1.amazonaws.com"
-  s3_hosted_zone_id   = "Z3O0J2DX0C6PQG"
+  # The target is now the CloudFront URL (e.g., d123.cloudfront.net)
+  type    = "CNAME"
+  records = [module.cloudfront_qa.domain_name]
+  ttl     = 300
 
-  common_tags         = local.common_tags
+  common_tags = local.common_tags
 }
