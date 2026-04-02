@@ -50,9 +50,8 @@ resource "aws_ecr_lifecycle_policy" "backend_repo_policy" {
 }
 
 # 4. Updated Output (To see your new URLs)
-output "backend_ecr_urls" {
-  value = {
-    for k, v in aws_ecr_repository.backend_repos : k => v.repository_url
-  }
-  description = "List of ECR URLs for each environment"
+output "ecr_origin" {
+  # This splits the URL by '/' and takes the first part (the domain)
+  value       = split("/", aws_ecr_repository.docker_repo.repository_url)[0]
+  description = "The ECR Registry Origin (Account ID and Region)"
 }

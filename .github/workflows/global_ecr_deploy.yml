@@ -70,11 +70,16 @@ jobs:
         run: terraform apply -input=false tfplan
 
       # -------------------------
-      # 7️⃣ Capture ECR URI
+      # 7️⃣ Capture ECR Origin
       # -------------------------
-      - name: "Output ECR URI"
+      - name: "Output ECR Origin"
         id: ecr
         run: |
-          ECR_URI=$(terraform output -raw ecr_uri)
-          echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
-          echo "ECR_URI=$ECR_URI"
+          # Capture only the base registry URL
+          ORIGIN=$(terraform output -raw ecr_origin)
+          
+          # Store it in GITHUB_ENV for use in later steps
+          echo "ECR_ORIGIN=$ORIGIN" >> $GITHUB_ENV
+          
+          # Debug output to console
+          echo "ECR Origin is: $ORIGIN
