@@ -8,32 +8,7 @@ locals {
   }
 }
 
-# =========================
-# DYNAMIC AMI (Ubuntu 24.04 - Canonical)
-# =========================
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = ["099720109477"]
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-*-amd64-server-*"]
-  }
-
-  filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
-# =========================
-# IMPORT VPC & SG from QA remote state
-# =========================
+# Pulling networking from your core S3 bucket
 data "terraform_remote_state" "qa_core" {
   backend = "s3"
   config = {
@@ -44,15 +19,55 @@ data "terraform_remote_state" "qa_core" {
 }
 
 # =========================
-# EC2 COMPUTE
+# ULTRA-LIGHT EKS FOR DEMO
 # =========================
-module "compute_qa" {
-  source = "../../modules/ec2-instance"
+module "eks_qa" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 20.0"
 
-  env               = local.env
-  ami_id            = data.aws_ami.ubuntu.id
-  instance_type     = "t3.micro"
-  subnet_id         = data.terraform_remote_state.qa_core.outputs.public_subnet_id
-  security_group_id = data.terraform_remote_state.qa_core.outputs.web_sg_id
-  common_tags       = local.common_tags
+  cluster_name    = "unboundshare-${local.env}-cluster"
+  cluster_version = "1.29"
+
+  vpc_id     = data.terraform_remote_state.qa_core.outputs.vpc_id
+  subnet_ids = data.terraform_remote_state.qa_core.outputs.private_subnets
+
+  # ❌ DISABLE HEAVY FEATURES
+  create_cloudwatch_log_group            = false # Saves RAM & Money
+  cluster_endpoint_public_access         = true
+  enable_cluster_creator_admin_permissions = true
+
+  # ❌ OPTIONAL: Reduce Add-on resources (CoreDNS/Kube-Proxy)
+  # By default, these are small, but avoid installing "Metrics Server"
+  # or "Fluentd/Prometheus" via Helm later.
+
+  eks_managed_node_groups = {
+    demo_node = {
+      # THE ABSOLUTE MINIMUM
+      min_size     = 1
+      max_size     = 1
+      desired_size = 1
+
+      instance_types = ["t3.micro"] # 1GB RAM
+      capacity_type  = "ON_DEMAND"
+
+      # Essential for pulling your "hello-backend" from ECR
+      iam_role_additional_policies = {
+        AmazonEC2ContainerRegistryReadOnly = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+      }
+
+      # Clean up storage to keep the node light
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size           = 20
+            volume_type           = "gp3"
+            delete_on_termination = true
+          }
+        }
+      }
+    }
+  }
+
+  tags = local.common_tags
 }

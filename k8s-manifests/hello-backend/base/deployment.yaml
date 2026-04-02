@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hello-backend
+  template:
+    metadata:
+      labels:
+        app: hello-backend
+    spec:
+      containers:
+        - name: hello-backend
+          image: hello-backend-image-placeholder
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: "100m"      # Lowered for t3.micro
+              memory: "256Mi"  # Lowered for t3.micro
+            limits:
+              cpu: "200m"
+              memory: "512Mi"  # Absolute max for a 1GB node

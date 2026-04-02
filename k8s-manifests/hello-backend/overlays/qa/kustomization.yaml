@@ -1,0 +1,10 @@
+resources:
+  - ../../base
+
+images:
+  - name: hello-backend-image-placeholder
+    newName: 975050065947.dkr.ecr.ap-southeast-1.amazonaws.com/unboundshare/qa/hello-backend
+    newTag: latest
+
+# Enterprise tip: Add a suffix to resources so they don't clash in shared clusters
+nameSuffix: -qa

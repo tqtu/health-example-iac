@@ -1,0 +1,5 @@
+images:
+  - name: hello-backend-image-placeholder
+    # Update -1 to -2 if your ECR is in Sydney!
+    newName: 975050065947.dkr.ecr.ap-southeast-2.amazonaws.com/unboundshare/production/hello-backend
+    newTag: latest
