@@ -82,4 +82,4 @@ jobs:
           echo "ECR_ORIGIN=$ORIGIN" >> $GITHUB_ENV
           
           # Debug output to console
-          echo "ECR Origin is: $ORIGIN
+          echo "ECR Origin is: $ORIGIN"
