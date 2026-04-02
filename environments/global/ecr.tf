@@ -12,7 +12,7 @@ resource "aws_ecr_repository" "docker_repo" {
 # 2. Environment Specific Repositories (The ones your GitHub Action needs)
 variable "environments" {
   type    = list(string)
-  default = ["qa", "staging", "prod"]
+  default = ["qa", "staging", "production"]
 }
 
 resource "aws_ecr_repository" "backend_repos" {
