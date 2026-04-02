@@ -1,3 +1,4 @@
+# 1. Base Repository (Optional - you can keep this if you use it for other things)
 resource "aws_ecr_repository" "docker_repo" {
   name                 = "unboundshare"
   image_tag_mutability = "MUTABLE"
@@ -8,9 +9,27 @@ resource "aws_ecr_repository" "docker_repo" {
   }
 }
 
-# Separate lifecycle policy
-resource "aws_ecr_lifecycle_policy" "docker_repo_policy" {
-  repository = aws_ecr_repository.docker_repo.name
+# 2. Environment Specific Repositories (The ones your GitHub Action needs)
+variable "environments" {
+  type    = list(string)
+  default = ["qa", "staging", "prod"]
+}
+
+resource "aws_ecr_repository" "backend_repos" {
+  for_each = toset(var.environments)
+
+  name                 = "unboundshare/${each.value}/hello-backend"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
+# 3. Apply Lifecycle Policy to ALL new repositories
+resource "aws_ecr_lifecycle_policy" "backend_repo_policy" {
+  for_each   = aws_ecr_repository.backend_repos # This links the policy to all 3 repos
+  repository = each.value.name
 
   policy = jsonencode({
     rules = [
@@ -30,7 +49,10 @@ resource "aws_ecr_lifecycle_policy" "docker_repo_policy" {
   })
 }
 
-output "ecr_uri" {
-  value       = aws_ecr_repository.docker_repo.repository_url
-  description = "AWS ECR repository URI for backend Docker images"
+# 4. Updated Output (To see your new URLs)
+output "backend_ecr_urls" {
+  value = {
+    for k, v in aws_ecr_repository.backend_repos : k => v.repository_url
+  }
+  description = "List of ECR URLs for each environment"
 }
