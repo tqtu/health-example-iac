@@ -3,7 +3,7 @@
 # =========================
 variable "qa_cloudfront_domain" {
   type    = string
-  default = "https://E1ZYLTK3AKBY4U.cloudfront.net"
+  default = "https://dcsivaay3lltb.cloudfront.net/"
 }
 
 resource "aws_cloudfront_function" "redirect_env" {

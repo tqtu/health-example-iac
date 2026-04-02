@@ -1,17 +1,16 @@
-name: "Terraform Infrastructure Deploy"
+name: "Terraform Compute Deploy"
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Select target environment"
+        description: "Select target environment (compute only)"
         required: true
         default: "qa"
         type: choice
         options:
           - qa
           - production
-          - infrastructure
 
 permissions:
   contents: read
@@ -31,12 +30,12 @@ jobs:
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_UNBOUNDSHARE }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_UNBOUNDSHARE }}
-      AWS_REGION: ap-southeast-2   # <-- direct value
+      AWS_REGION: ap-southeast-2
       TF_LOG: "INFO"
 
     defaults:
       run:
-        working-directory: ./environments/${{ github.event.inputs.environment }}
+        working-directory: ./environments/${{ github.event.inputs.environment }}-compute
 
     steps:
       - name: "Checkout Code"
@@ -63,8 +62,8 @@ jobs:
       - name: "Upload Plan Artifact"
         uses: actions/upload-artifact@v4
         with:
-          name: infrastructure-plan
-          path: ./environments/${{ github.event.inputs.environment }}/tfplan
+          name: compute-plan
+          path: ./environments/${{ github.event.inputs.environment }}-compute/tfplan
           retention-days: 1
 
   # =========================
@@ -80,11 +79,11 @@ jobs:
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_UNBOUNDSHARE }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_UNBOUNDSHARE }}
-      AWS_REGION: ap-southeast-2   # <-- direct value
+      AWS_REGION: ap-southeast-2
 
     defaults:
       run:
-        working-directory: ./environments/${{ github.event.inputs.environment }}
+        working-directory: ./environments/${{ github.event.inputs.environment }}-compute
 
     steps:
       - name: "Checkout Code"
@@ -93,8 +92,8 @@ jobs:
       - name: "Download Plan Artifact"
         uses: actions/download-artifact@v4
         with:
-          name: infrastructure-plan
-          path: ./environments/${{ github.event.inputs.environment }}/
+          name: compute-plan
+          path: ./environments/${{ github.event.inputs.environment }}-compute/
 
       - name: "Install Terraform"
         uses: hashicorp/setup-terraform@v3

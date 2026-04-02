@@ -1,31 +1,27 @@
-name: "Terraform Route 53 Deployment"
+name: "Environment Deploy - Terraform"
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Where to run? (global/qa/prod)"
-        required: true
-        default: "qa"
-        type: choice
-        options:
-          - global/route53
-          - environments/qa
-          - environments/prod
+  # Trigger whenever code changes under environments/qa or environments/production
+  push:
+    paths:
+      - "environments/qa/**"
+      - "environments/production/**"
 
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_UNBOUNDSHARE }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_UNBOUNDSHARE }}
-  AWS_REGION: "ap-southeast-1" # Your Singapore Region
+  AWS_REGION: "ap-southeast-2" # Your Singapore Region
 
 jobs:
-  terraform:
+  terraform-apply:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env_folder: [environments/qa, environments/production]
 
     defaults:
       run:
-        # This uses your input to go to the right folder automatically
-        working-directory: ./${{ github.event.inputs.environment }}
+        working-directory: ${{ matrix.env_folder }}
 
     steps:
       - name: "Checkout Code"
@@ -43,5 +39,4 @@ jobs:
         run: terraform plan
 
       - name: "Terraform Apply"
-        # Only apply if it's a manual trigger
         run: terraform apply -auto-approve
