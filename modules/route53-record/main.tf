@@ -4,4 +4,7 @@ resource "aws_route53_record" "this" {
   type    = var.type
   ttl     = var.ttl
   records = var.records
+
+  # Allows Terraform to update the record even if it already exists in AWS
+  allow_overwrite = true
 }

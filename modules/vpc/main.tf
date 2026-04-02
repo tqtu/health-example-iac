@@ -5,16 +5,26 @@ resource "aws_vpc" "this" {
   tags = merge(var.common_tags, { Name = "${var.env}-vpc" })
 }
 
+data "aws_availability_zones" "available" {}
+
 resource "aws_subnet" "public" {
-  count             = 2
-  vpc_id            = aws_vpc.this.id
-  cidr_block        = cidrsubnet(var.cidr, 8, count.index)
-  availability_zone = data.aws_availability_zones.available.names[count.index]
+  count                   = 2
+  vpc_id                  = aws_vpc.this.id
+  cidr_block              = cidrsubnet(var.cidr, 8, count.index)
+  availability_zone       = data.aws_availability_zones.available.names[count.index]
   map_public_ip_on_launch = true
   tags = merge(var.common_tags, { Name = "${var.env}-public-${count.index}" })
 }
 
-data "aws_availability_zones" "available" {}
+resource "aws_subnet" "private" {
+  count             = 2
+  vpc_id            = aws_vpc.this.id
+  cidr_block        = cidrsubnet(var.cidr, 8, count.index + 10)
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+  tags = merge(var.common_tags, { Name = "${var.env}-private-${count.index}" })
+}
 
+# --- THE MODULE OUTPUTS ---
 output "vpc_id" { value = aws_vpc.this.id }
-output "public_subnet_ids" { value = aws_subnet.public[*].id }
+output "public_subnets" { value = aws_subnet.public[*].id }
+output "private_subnets" { value = aws_subnet.private[*].id }

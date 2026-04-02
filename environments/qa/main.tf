@@ -9,7 +9,7 @@ locals {
 }
 
 # =========================
-# VPC
+# 1. VPC (The Network Foundation)
 # =========================
 module "vpc" {
   source      = "../../modules/vpc"
@@ -19,7 +19,7 @@ module "vpc" {
 }
 
 # =========================
-# SECURITY GROUPS
+# 2. SECURITY GROUPS
 # =========================
 module "security_groups" {
   source = "../../modules/security-groups"
@@ -28,7 +28,7 @@ module "security_groups" {
 }
 
 # =========================
-# CLOUDFRONT for QA
+# 3. CLOUDFRONT (Frontend Distribution)
 # =========================
 module "cloudfront_qa" {
   source      = "../../modules/cloudfront"
@@ -36,11 +36,12 @@ module "cloudfront_qa" {
   common_tags = local.common_tags
 
   domain_name           = "unboundshare.com"
+  # Note: Ensure this S3 bucket exists in your ap-southeast-1/2 region
   s3_bucket_domain_name = "unboundshare-frontend-qa-31-03-2026-1.s3-website-ap-southeast-1.amazonaws.com"
 }
 
 # =========================
-# ROUTE53 for QA
+# 4. ROUTE53 (DNS Management)
 # =========================
 data "aws_route53_zone" "selected" {
   name = "unboundshare.com"
